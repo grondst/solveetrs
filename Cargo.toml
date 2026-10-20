@@ -1,6 +1,8 @@
 [package]
-name = "LeetCode"
+name = "solveetrs"
 version = "0.1.0"
 edition = "2024"
+description = "My LeetCode solutions in Rust"
+publish = false
 
 [dependencies]
