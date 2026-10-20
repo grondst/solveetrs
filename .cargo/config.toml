@@ -1,0 +1,2 @@
+[alias]
+np = "run --quiet --bin new_problem --"
