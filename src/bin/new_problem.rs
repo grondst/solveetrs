@@ -16,7 +16,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn example_1() {
+    fn case_1() {
         assert_eq!(1, 1);
     }
 }
