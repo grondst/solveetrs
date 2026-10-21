@@ -1,10 +1,8 @@
-use std::io::Write;
-use std::fs::OpenOptions;
-use std::{fs, io};
+use std::env;
 use std::path::Path;
+use std::{fs, io};
 
-const TEMPLATE: &str = r#"
-// https://leetcode.com/problems/name_of_problem/
+const TEMPLATE: &str = r#"// https://leetcode.com/problems/name_of_problem/
 // Time: O(?) Space: O(?)
 
 pub struct Solution;
@@ -25,13 +23,12 @@ mod tests {
 "#;
 
 fn normalize_name(slug: &str) -> String {
-    let name = slug.trim()
+    slug.trim()
         .to_lowercase()
+        .replace('_', " ")
         .split_whitespace()
         .collect::<Vec<_>>()
         .join("-")
-        .replace('_', "-");
-    name
 }
 
 fn validate_difficulty(difficulty: &str) -> io::Result<()> {
@@ -59,13 +56,26 @@ fn create_problem_file(dir: &str, module: &str, name: &str) -> io::Result<String
     Ok(path)
 }
 
-fn register_module(dir: &str, module: &str) -> io::Result<()> {
+fn register_and_sort_module(dir: &str, module: &str) -> io::Result<()> {
     let mod_path = Path::new(dir).join("mod.rs");
-    let mut file = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(mod_path)?;
-    writeln!(file, "pub mod {module};")
+
+    let existing = match fs::read_to_string(&mod_path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e),
+    };
+
+    let mut content: Vec<String> = existing
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(String::from)
+        .collect();
+
+    content.push(format!("pub mod {module};"));
+    content.sort();
+    content.dedup();
+
+    fs::write(&mod_path, content.join("\n") + "\n")
 }
 
 fn make_problem(num: u32, slug: &str, difficulty: &str) -> io::Result<()> {
@@ -76,13 +86,35 @@ fn make_problem(num: u32, slug: &str, difficulty: &str) -> io::Result<()> {
     let module = format!("p{num:04}_{}", name.replace('-', "_"));
 
     let path = create_problem_file(&dir, &module, &name)?;
-    register_module(&dir, &module)?;
+    register_and_sort_module(&dir, &module)?;
 
     println!("created {path}");
     Ok(())
 }
 
+fn run() -> io::Result<()> {
+    let args: Vec<String> = env::args().collect();
 
-fn main() -> io::Result<(), std::io::Error> {
-    make_problem(1, "NUMber of_ELEMENTS", "hard")
+    if args.len() != 4 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "usage: cargo np <number> <slug> <easy|medium|hard>",
+        ));
+    }
+
+    let num: u32 = args[1].parse().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("'{}' is not a valid problem number", args[1]),
+        )
+    })?;
+
+    make_problem(num, &args[2], &args[3])
+}
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("error: {e}");
+        std::process::exit(1);
+    }
 }
